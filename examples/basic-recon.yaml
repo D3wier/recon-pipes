@@ -1,0 +1,26 @@
+name: basic-recon
+target: example.com
+
+steps:
+  - name: subdomains
+    tool: subfinder
+    args: "-d {{target}} -silent"
+    output: subdomains.txt
+
+  - name: live-hosts
+    tool: httpx
+    input: subdomains.txt
+    args: "-silent -mc 200,301,302,403"
+    output: live_hosts.txt
+
+  - name: nuclei-scan
+    tool: nuclei
+    input: live_hosts.txt
+    args: "-t cves/ -severity medium,high,critical -silent"
+    output: findings.txt
+    notify: true
+
+options:
+  rate_limit: 50/s
+  dedup: true
+  parallel: 2

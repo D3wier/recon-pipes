@@ -1,0 +1,64 @@
+name: full-recon
+target: example.com
+
+steps:
+  - name: subdomains
+    tool: subfinder
+    args: "-d {{target}} -all -silent"
+    output: subdomains.txt
+    timeout: 600
+
+  - name: dns-resolve
+    tool: dnsx
+    input: subdomains.txt
+    args: "-silent -a -resp"
+    output: resolved.txt
+
+  - name: live-hosts
+    tool: httpx
+    input: subdomains.txt
+    args: "-silent -status-code -title -tech-detect -follow-redirects"
+    output: live_hosts.txt
+
+  - name: urls-wayback
+    tool: gau
+    args: "{{target}} --threads 5"
+    output: wayback_urls.txt
+    timeout: 600
+
+  - name: urls-crawl
+    tool: katana
+    input: live_hosts.txt
+    args: "-silent -d 3 -jc"
+    output: crawl_urls.txt
+    timeout: 600
+
+  - name: js-files
+    tool: httpx
+    input: crawl_urls.txt
+    args: "-silent -mc 200 -match-regex '\\.js$'"
+    output: js_files.txt
+
+  - name: content-discovery
+    tool: feroxbuster
+    input: live_hosts.txt
+    args: "--stdin --silent -w /usr/share/wordlists/dirb/common.txt"
+    output: directories.txt
+    timeout: 900
+
+  - name: nuclei-scan
+    tool: nuclei
+    input: live_hosts.txt
+    args: "-t cves/,exposures/,misconfiguration/ -severity medium,high,critical -silent"
+    output: findings.txt
+    notify: true
+
+options:
+  rate_limit: 30/s
+  dedup: true
+  parallel: 3
+  resume: true
+  output_dir: "./results/{{date}}"
+  notify:
+    webhook: "${SLACK_WEBHOOK}"
+    on: [complete, error]
