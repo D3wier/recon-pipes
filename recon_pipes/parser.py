@@ -10,14 +10,24 @@ def parse_pipeline(path: str) -> Pipeline:
     content = Path(path).read_text()
     data = yaml.safe_load(content)
 
-    options_data = data.get("options", {})
+    options_data = data.get("options", {}) or {}
     notify_data = options_data.pop("notify", None)
-    notify = NotifyConfig(**notify_data) if notify_data else None
-    options = PipelineOptions(**options_data, notify=notify)
+    notify = None
+    if notify_data and isinstance(notify_data, dict):
+        notify = NotifyConfig(
+            webhook=str(notify_data.get("webhook", "")),
+            on=notify_data.get("on", ["complete", "error"]),
+        )
+
+    valid_option_fields = {"rate_limit", "dedup", "parallel", "resume", "output_dir"}
+    filtered_options = {k: v for k, v in options_data.items() if k in valid_option_fields}
+    options = PipelineOptions(**filtered_options, notify=notify)
 
     steps = []
     for step_data in data.get("steps", []):
-        steps.append(Step(**step_data))
+        valid_step_fields = {"name", "tool", "args", "input", "output", "notify", "rate_limit", "timeout", "depends_on"}
+        filtered_step = {k: v for k, v in step_data.items() if k in valid_step_fields}
+        steps.append(Step(**filtered_step))
 
     return Pipeline(
         name=data.get("name", "unnamed"),
