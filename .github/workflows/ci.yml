@@ -30,5 +30,14 @@ jobs:
 
       - name: Validate examples
         run: |
-          recon-pipes validate examples/basic-recon.yaml
-          recon-pipes validate examples/full-recon.yaml
+          python -c "
+          from recon_pipes.parser import parse_pipeline
+          p = parse_pipeline('examples/basic-recon.yaml')
+          assert p.name == 'basic-recon'
+          assert len(p.steps) == 3
+          print('basic-recon.yaml OK')
+          p = parse_pipeline('examples/full-recon.yaml')
+          assert p.name == 'full-recon'
+          assert len(p.steps) >= 5
+          print('full-recon.yaml OK')
+          "
